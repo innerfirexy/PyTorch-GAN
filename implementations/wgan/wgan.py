@@ -15,9 +15,32 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+from pathlib import Path
+from typing import List, Optional, Sequence, Union, Any, Callable
+from torch.utils.data import DataLoader, Dataset
+from torchvision.datasets.folder import default_loader
+
+
+class MyDataset(Dataset):
+    def __init__(self, data_path:str, split:str, transform: Callable, **kwargs):
+        self.data_dir = Path(data_path)
+        self.transforms = transform
+        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.jpg'])
+        self.imgs = imgs[:int(len(imgs) * 0.75)] if split == "train" else imgs[int(len(imgs) * 0.75):]
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, idx):
+        img = default_loader(self.imgs[idx])
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img
+
 os.makedirs("images", exist_ok=True)
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--data', type=str, default='', help='path to training data')
 parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.00005, help="learning rate")
@@ -89,17 +112,27 @@ if cuda:
     discriminator.cuda()
 
 # Configure data loader
-os.makedirs("../../data/mnist", exist_ok=True)
-dataloader = torch.utils.data.DataLoader(
-    datasets.MNIST(
-        "../../data/mnist",
-        train=True,
-        download=True,
+if opt.data:
+    mydataset = MyDataset(
+        data_path=opt.data,
+        split='train',
         transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]),
-    ),
-    batch_size=opt.batch_size,
-    shuffle=True,
-)
+    )
+    dataloader = DataLoader(mydataset,
+                            batch_size=opt.batch_size,
+                            shuffle=True)
+else:
+    os.makedirs("../../data/mnist", exist_ok=True)
+    dataloader = torch.utils.data.DataLoader(
+        datasets.MNIST(
+            "../../data/mnist",
+            train=True,
+            download=True,
+            transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]),
+        ),
+        batch_size=opt.batch_size,
+        shuffle=True,
+    )
 
 # Optimizers
 optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=opt.lr)
