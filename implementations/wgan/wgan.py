@@ -21,22 +21,6 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets.folder import default_loader
 
 
-class MyDataset(Dataset):
-    def __init__(self, data_path:str, split:str, transform: Callable, **kwargs):
-        self.data_dir = Path(data_path)
-        self.transforms = transform
-        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.jpg'])
-        self.imgs = imgs[:int(len(imgs) * 0.75)] if split == "train" else imgs[int(len(imgs) * 0.75):]
-
-    def __len__(self):
-        return len(self.imgs)
-
-    def __getitem__(self, idx):
-        img = default_loader(self.imgs[idx])
-        if self.transforms is not None:
-            img = self.transforms(img)
-        return img
-
 os.makedirs("images", exist_ok=True)
 
 parser = argparse.ArgumentParser()
@@ -57,6 +41,23 @@ print(opt)
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 cuda = True if torch.cuda.is_available() else False
+
+
+class MyDataset(Dataset):
+    def __init__(self, data_path:str, split:str, transform: Callable, **kwargs):
+        self.data_dir = Path(data_path)
+        self.transforms = transform
+        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.png'])
+        self.imgs = imgs[:int(len(imgs) * 0.75)] if split == "train" else imgs[int(len(imgs) * 0.75):]
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, idx):
+        img = default_loader(self.imgs[idx])
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img, 0.0
 
 
 class Generator(nn.Module):
@@ -118,6 +119,7 @@ if opt.data:
         split='train',
         transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]),
     )
+    print(len(mydataset))
     dataloader = DataLoader(mydataset,
                             batch_size=opt.batch_size,
                             shuffle=True)
