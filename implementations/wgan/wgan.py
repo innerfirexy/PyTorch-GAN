@@ -146,7 +146,7 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 # ----------
 #  Training
 # ----------
-os.mkdirs('saved_models', exist_ok=True)
+os.makedirs('saved_models', exist_ok=True)
 batches_done = 0
 for epoch in range(opt.n_epochs):
 
