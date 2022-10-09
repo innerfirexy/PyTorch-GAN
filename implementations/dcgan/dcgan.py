@@ -231,6 +231,7 @@ for epoch in range(opt.n_epochs):
             "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Remaining time: %d:%d:%d]"
             % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item(), remain_hr, remain_min, remain_sec)
         )
+        sys.stdout.flush()
 
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt.sample_interval == 0:
