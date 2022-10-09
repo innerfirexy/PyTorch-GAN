@@ -228,7 +228,7 @@ for epoch in range(opt.n_epochs):
         remain_min = (remain_time % 3600) // 60
         remain_sec = (remain_time % 3600) % 60
         sys.stdout.write(
-            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Remaining time: %d:%d:%d]"
+            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Remaining time: %d:%d:%d]"
             % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item(), remain_hr, remain_min, remain_sec)
         )
         sys.stdout.flush()
