@@ -213,7 +213,7 @@ for epoch in range(opt.n_epochs):
             }, checkpoint_path)
         batches_done += 1
 
-# Save the checkpoint
+# Save the model
 now = datetime.now().strftime('%Y.%m.%d-%H.%M.%S')
 model_path = 'saved_models/generator_{}.pth'.format(now)
 torch.save(generator.state_dict(), model_path)
