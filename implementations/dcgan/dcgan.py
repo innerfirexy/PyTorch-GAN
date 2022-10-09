@@ -1,8 +1,11 @@
 import argparse
 import os
+import sys
+
 import numpy as np
 import math
 from datetime import datetime
+import time
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -177,6 +180,7 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 os.makedirs('saved_models', exist_ok=True)
 for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
+        start_time = time.time()
 
         # Adversarial ground truths
         valid = Variable(Tensor(imgs.shape[0], 1).fill_(1.0), requires_grad=False)
@@ -217,9 +221,15 @@ for epoch in range(opt.n_epochs):
         d_loss.backward()
         optimizer_D.step()
 
-        print(
-            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-            % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
+        end_time = time.time()
+        remain_batches = len(dataloader) - (i+1) + (opt.n_epochs - epoch - 1)*len(dataloader)
+        remain_time = remain_batches * (end_time - start_time)
+        remain_hr = remain_time // 3600
+        remain_min = (remain_time % 3600) // 60
+        remain_sec = (remain_time % 3600) % 60
+        sys.stdout.write(
+            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Remaining time: %d:%d:%d]"
+            % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item(), remain_hr, remain_min, remain_sec)
         )
 
         batches_done = epoch * len(dataloader) + i
