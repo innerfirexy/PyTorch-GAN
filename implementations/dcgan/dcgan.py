@@ -178,9 +178,9 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 #  Training
 # ----------
 os.makedirs('saved_models', exist_ok=True)
+start_time = time.time()
 for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
-        start_time = time.time()
 
         # Adversarial ground truths
         valid = Variable(Tensor(imgs.shape[0], 1).fill_(1.0), requires_grad=False)
@@ -192,7 +192,6 @@ for epoch in range(opt.n_epochs):
         # -----------------
         #  Train Generator
         # -----------------
-
         optimizer_G.zero_grad()
 
         # Sample noise as generator input
@@ -210,7 +209,6 @@ for epoch in range(opt.n_epochs):
         # ---------------------
         #  Train Discriminator
         # ---------------------
-
         optimizer_D.zero_grad()
 
         # Measure discriminator's ability to classify real from generated samples
@@ -221,9 +219,10 @@ for epoch in range(opt.n_epochs):
         d_loss.backward()
         optimizer_D.step()
 
-        end_time = time.time()
+        batches_done = epoch * len(dataloader) + i
+        estimated_time_per_batch = (time.time() - start_time) / batches_done
         remain_batches = len(dataloader) - (i+1) + (opt.n_epochs - epoch - 1)*len(dataloader)
-        remain_time = remain_batches * (end_time - start_time)
+        remain_time = remain_batches * estimated_time_per_batch
         remain_hr = remain_time // 3600
         remain_min = (remain_time % 3600) // 60
         remain_sec = (remain_time % 3600) % 60
@@ -233,7 +232,7 @@ for epoch in range(opt.n_epochs):
         )
         sys.stdout.flush()
 
-        batches_done = epoch * len(dataloader) + i
+
         if batches_done % opt.sample_interval == 0:
             save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
             # Save to checkpoint
