@@ -3,6 +3,7 @@ import os
 import numpy as np
 import math
 import sys
+from datetime import datetime
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -145,7 +146,7 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 # ----------
 #  Training
 # ----------
-
+os.mkdirs('saved_models', exist_ok=True)
 batches_done = 0
 for epoch in range(opt.n_epochs):
 
@@ -199,4 +200,20 @@ for epoch in range(opt.n_epochs):
 
         if batches_done % opt.sample_interval == 0:
             save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+            # Save to checkpoint
+            checkpoint_path = 'saved_models/checkpoint.pt'
+            torch.save({
+                'epoch': opt.n_epochs,
+                'G_model_state_dict': generator.state_dict(),
+                'G_optimizer_state_dict': optimizer_G.state_dict(),
+                'G_loss': loss_G.item(),
+                'D_model_state_dict': discriminator.state_dict(),
+                'D_optimizer_state_dict': optimizer_D.state_dict(),
+                'D_loss': loss_D.item(),
+            }, checkpoint_path)
         batches_done += 1
+
+# Save the checkpoint
+now = datetime.now().strftime('%Y.%m.%d-%H.%M.%S')
+model_path = 'saved_models/generator_{}.pth'.format(now)
+torch.save(generator.state_dict(), model_path)
