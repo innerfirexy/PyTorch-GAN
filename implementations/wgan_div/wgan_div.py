@@ -3,6 +3,8 @@ import os
 import numpy as np
 import math
 import sys
+from datetime import datetime
+import time
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -15,6 +17,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as autograd
 import torch
+
+from pathlib import Path
+from typing import List, Optional, Sequence, Union, Any, Callable
+from torch.utils.data import DataLoader, Dataset
+from torchvision.datasets.folder import default_loader
 
 os.makedirs("images", exist_ok=True)
 
@@ -37,6 +44,22 @@ print(opt)
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 cuda = True if torch.cuda.is_available() else False
+
+class MyDataset(Dataset):
+    def __init__(self, data_path:str, split:str, transform: Callable, **kwargs):
+        self.data_dir = Path(data_path)
+        self.transforms = transform
+        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.png'])
+        self.imgs = imgs[:int(len(imgs) * 0.75)] if split == "train" else imgs[int(len(imgs) * 0.75):]
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, idx):
+        img = default_loader(self.imgs[idx])
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img, 0.0
 
 
 class Generator(nn.Module):
@@ -96,19 +119,34 @@ if cuda:
     discriminator.cuda()
 
 # Configure data loader
-os.makedirs("../../data/mnist", exist_ok=True)
-dataloader = torch.utils.data.DataLoader(
-    datasets.MNIST(
-        "../../data/mnist",
-        train=True,
-        download=True,
-        transform=transforms.Compose(
-            [transforms.Resize(opt.img_size), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
+if opt.data:
+    if opt.channels == 1:
+        my_transform = transforms.Compose([transforms.Grayscale(), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
+    else:
+        my_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
+    mydataset = MyDataset(
+        data_path=opt.data,
+        split='train',
+        transform=my_transform,
+    )
+    print(len(mydataset))
+    dataloader = DataLoader(mydataset,
+                            batch_size=opt.batch_size,
+                            shuffle=True)
+else:
+    os.makedirs("../../data/mnist", exist_ok=True)
+    dataloader = torch.utils.data.DataLoader(
+        datasets.MNIST(
+            "../../data/mnist",
+            train=True,
+            download=True,
+            transform=transforms.Compose(
+                [transforms.Resize(opt.img_size), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
+            ),
         ),
-    ),
-    batch_size=opt.batch_size,
-    shuffle=True,
-)
+        batch_size=opt.batch_size,
+        shuffle=True,
+    )
 
 # Optimizers
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
@@ -119,7 +157,8 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 # ----------
 #  Training
 # ----------
-
+os.makedirs('saved_models', exist_ok=True)
+start_time = time.time()
 batches_done = 0
 for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
@@ -184,12 +223,34 @@ for epoch in range(opt.n_epochs):
             g_loss.backward()
             optimizer_G.step()
 
-            print(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
+            batches_done += opt.n_critic
+            estimated_time_per_batch = (time.time() - start_time) / batches_done
+            remain_batches = len(dataloader) - (i+1) + (opt.n_epochs - epoch - 1)*len(dataloader)
+            remain_time = remain_batches * estimated_time_per_batch
+            remain_hr = remain_time // 3600
+            remain_min = (remain_time % 3600) // 60
+            remain_sec = (remain_time % 3600) % 60
+            sys.stdout.write(
+                "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Remaining time: %d:%d:%d]"
+                % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item(), remain_hr, remain_min, remain_sec)
             )
+            sys.stdout.flush()
 
             if batches_done % opt.sample_interval == 0:
                 save_image(fake_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+                # Save to checkpoint
+                checkpoint_path = 'saved_models/checkpoint.pt'
+                torch.save({
+                    'epoch': opt.n_epochs,
+                    'G_model_state_dict': generator.state_dict(),
+                    'G_optimizer_state_dict': optimizer_G.state_dict(),
+                    'G_loss': g_loss.item(),
+                    'D_model_state_dict': discriminator.state_dict(),
+                    'D_optimizer_state_dict': optimizer_D.state_dict(),
+                    'D_loss': d_loss.item(),
+                }, checkpoint_path)
 
-            batches_done += opt.n_critic
+# Save the model
+now = datetime.now().strftime('%Y.%m.%d-%H.%M.%S')
+model_path = 'saved_models/generator_{}.pth'.format(now)
+torch.save(generator.state_dict(), model_path)
