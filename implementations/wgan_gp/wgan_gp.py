@@ -121,10 +121,14 @@ if cuda:
 
 # Configure data loader
 if opt.data:
+    if opt.channels == 1:
+        my_transform = transforms.Compose([transforms.Grayscale(), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
+    else:
+        my_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
     mydataset = MyDataset(
         data_path=opt.data,
         split='train',
-        transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]),
+        transform=my_transform,
     )
     print(len(mydataset))
     dataloader = DataLoader(mydataset,
