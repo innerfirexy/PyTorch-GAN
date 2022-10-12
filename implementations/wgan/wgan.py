@@ -4,6 +4,7 @@ import numpy as np
 import math
 import sys
 from datetime import datetime
+import time
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -151,6 +152,7 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 #  Training
 # ----------
 os.makedirs('saved_models', exist_ok=True)
+start_time = time.time()
 batches_done = 0
 for epoch in range(opt.n_epochs):
 
@@ -197,25 +199,32 @@ for epoch in range(opt.n_epochs):
             loss_G.backward()
             optimizer_G.step()
 
-            print(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, batches_done % len(dataloader), len(dataloader), loss_D.item(), loss_G.item())
+            batches_done += opt.n_critic
+            estimated_time_per_batch = (time.time() - start_time) / batches_done
+            remain_batches = len(dataloader) - (i+1) + (opt.n_epochs - epoch - 1)*len(dataloader)
+            remain_time = remain_batches * estimated_time_per_batch
+            remain_hr = remain_time // 3600
+            remain_min = (remain_time % 3600) // 60
+            remain_sec = (remain_time % 3600) % 60
+            sys.stdout.write(
+                "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [Remaining time: %d:%d:%d]"
+                % (epoch, opt.n_epochs, i, len(dataloader), loss_D.item(), loss_G.item(), remain_hr, remain_min, remain_sec)
             )
+            sys.stdout.flush()
 
-        if batches_done % opt.sample_interval == 0:
-            save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
-            # Save to checkpoint
-            checkpoint_path = 'saved_models/checkpoint.pt'
-            torch.save({
-                'epoch': opt.n_epochs,
-                'G_model_state_dict': generator.state_dict(),
-                'G_optimizer_state_dict': optimizer_G.state_dict(),
-                'G_loss': loss_G.item(),
-                'D_model_state_dict': discriminator.state_dict(),
-                'D_optimizer_state_dict': optimizer_D.state_dict(),
-                'D_loss': loss_D.item(),
-            }, checkpoint_path)
-        batches_done += 1
+            if batches_done % opt.sample_interval == 0:
+                save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+                # Save to checkpoint
+                checkpoint_path = 'saved_models/checkpoint.pt'
+                torch.save({
+                    'epoch': opt.n_epochs,
+                    'G_model_state_dict': generator.state_dict(),
+                    'G_optimizer_state_dict': optimizer_G.state_dict(),
+                    'G_loss': loss_G.item(),
+                    'D_model_state_dict': discriminator.state_dict(),
+                    'D_optimizer_state_dict': optimizer_D.state_dict(),
+                    'D_loss': loss_D.item(),
+                }, checkpoint_path)
 
 # Save the model
 now = datetime.now().strftime('%Y.%m.%d-%H.%M.%S')
