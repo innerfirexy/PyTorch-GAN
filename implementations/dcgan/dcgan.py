@@ -223,7 +223,7 @@ for epoch in range(opt.n_epochs):
         d_loss.backward()
         optimizer_D.step()
 
-        batches_done = epoch * len(dataloader) + i
+        batches_done = epoch * len(dataloader) + i + 1
         estimated_time_per_batch = (time.time() - start_time) / batches_done
         remain_batches = len(dataloader) - (i+1) + (opt.n_epochs - epoch - 1)*len(dataloader)
         remain_time = remain_batches * estimated_time_per_batch
