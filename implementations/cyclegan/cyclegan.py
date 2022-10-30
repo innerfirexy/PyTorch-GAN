@@ -51,24 +51,24 @@ criterion_GAN = torch.nn.MSELoss()
 criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
 
-cuda = torch.cuda.is_available()
+device = torch.devie('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 input_shape = (opt.channels, opt.img_height, opt.img_width)
 
 # Initialize generator and discriminator
-G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks)
-G_BA = GeneratorResNet(input_shape, opt.n_residual_blocks)
-D_A = Discriminator(input_shape)
-D_B = Discriminator(input_shape)
+G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks).to(device)
+G_BA = GeneratorResNet(input_shape, opt.n_residual_blocks).to(device)
+D_A = Discriminator(input_shape).to(device)
+D_B = Discriminator(input_shape).to(device)
 
-if cuda:
-    G_AB = G_AB.cuda()
-    G_BA = G_BA.cuda()
-    D_A = D_A.cuda()
-    D_B = D_B.cuda()
-    criterion_GAN.cuda()
-    criterion_cycle.cuda()
-    criterion_identity.cuda()
+# if cuda:
+#     G_AB = G_AB.cuda()
+#     G_BA = G_BA.cuda()
+#     D_A = D_A.cuda()
+#     D_B = D_B.cuda()
+#     criterion_GAN.cuda()
+#     criterion_cycle.cuda()
+#     criterion_identity.cuda()
 
 if opt.epoch != 0:
     # Load pretrained models
@@ -101,7 +101,7 @@ lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(
     optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step
 )
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
+# Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 
 # Buffers of previously generated samples
 fake_A_buffer = ReplayBuffer()
@@ -137,9 +137,11 @@ def sample_images(batches_done):
     imgs = next(iter(val_dataloader))
     G_AB.eval()
     G_BA.eval()
-    real_A = Variable(imgs["A"].type(Tensor))
+    # real_A = Variable(imgs["A"].type(Tensor))
+    real_A = torch.Tensor(imgs['A']).to(device)
     fake_B = G_AB(real_A)
-    real_B = Variable(imgs["B"].type(Tensor))
+    # real_B = Variable(imgs["B"].type(Tensor))
+    real_B = torch.Tensor(imgs['B']).to(device)
     fake_A = G_BA(real_B)
     # Arange images along x-axis
     real_A = make_grid(real_A, nrow=5, normalize=True)
@@ -160,12 +162,16 @@ for epoch in range(opt.epoch, opt.n_epochs):
     for i, batch in enumerate(dataloader):
 
         # Set model input
-        real_A = Variable(batch["A"].type(Tensor))
-        real_B = Variable(batch["B"].type(Tensor))
+        # real_A = Variable(batch["A"].type(Tensor))
+        # real_B = Variable(batch["B"].type(Tensor))
+        real_A = batch['A'].to(device)
+        real_B = batch['B'].to(device)
 
         # Adversarial ground truths
-        valid = Variable(Tensor(np.ones((real_A.size(0), *D_A.output_shape))), requires_grad=False)
-        fake = Variable(Tensor(np.zeros((real_A.size(0), *D_A.output_shape))), requires_grad=False)
+        # valid = Variable(Tensor(np.ones((real_A.size(0), *D_A.output_shape))), requires_grad=False)
+        # fake = Variable(Tensor(np.zeros((real_A.size(0), *D_A.output_shape))), requires_grad=False)
+        valid = torch.ones((real_A.size(0), *D_A.output_shape), requires_grad=False).to(device)
+        fake = torch.zeros((real_A.size(0), *D_A.output_shape), requires_grad=False).to(device)
 
         # ------------------
         #  Train Generators
